@@ -127,7 +127,7 @@ public class ScheduledTasks {
 	}
 	
 	//每天凌晨3点执行一次商家信息导入操作
-	@Scheduled(cron="0 0 3 * * ?")
+	//@Scheduled(cron="0 0 3 * * ?")
 	public void importSupplyerInfo()
 	{
 		long begintime = System.currentTimeMillis();
