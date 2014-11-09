@@ -22,7 +22,7 @@
                 <maxFileSize>20MB</maxFileSize>  
             </timeBasedFileNamingAndTriggeringPolicy>
 			<!-- 保留30个周期的日志文件 -->
-			<MaxHistory>${MAX_HISTORY}</MaxHistory>
+			<maxHistory>${MAX_HISTORY}</maxHistory>
 		</rollingPolicy>
 		
 		<encoder>
