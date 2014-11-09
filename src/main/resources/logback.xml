@@ -15,12 +15,12 @@
 	<appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
 		<!-- <File>${LOG_HOME}/community.log</File> -->
 		<rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-			<FileNamePattern>
+			<fileNamePattern>
 				${LOG_HOME}/community.log.%d{yyyy-MM-dd}.log
-			</FileNamePattern>
-			<timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">  
+			</fileNamePattern>
+			<!-- <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">  
                 <maxFileSize>20MB</maxFileSize>  
-            </timeBasedFileNamingAndTriggeringPolicy>
+            </timeBasedFileNamingAndTriggeringPolicy> -->
 			<!-- 保留30个周期的日志文件 -->
 			<maxHistory>${MAX_HISTORY}</maxHistory>
 		</rollingPolicy>
