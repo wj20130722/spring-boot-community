@@ -45,6 +45,7 @@ import com.linkage.community.schedule.dbutils.CommonDBTemplate;
 import com.linkage.community.schedule.mail.MailSenderFactory;
 import com.linkage.community.schedule.mail.MailSenderType;
 import com.linkage.community.schedule.mail.SimpleMailSender;
+import com.linkage.community.schedule.service.UserService;
 import com.linkage.community.schedule.utils.CommonHttpUtil;
 import com.linkage.community.schedule.utils.Conver;
 import com.linkage.community.schedule.utils.FileUtils;
@@ -76,6 +77,9 @@ public class ScheduledTasks {
 
 	@Autowired
 	private CommonDBTemplate commonDBTemplate;
+	
+	//@Autowired
+	//private UserService userService;
 
 	 @Autowired
 	 private MemcachedClient memcachedClient;
@@ -86,8 +90,10 @@ public class ScheduledTasks {
 		// System.out.println(conn);
 
 		// DataSourceUtils.releaseConnection(conn, dataSource);
-		log.info("hi,this is logback");
+		//log.info("hi,this is logback");
 		System.out.println("The time is now " + dateFormat.format(new Date()));
+		//userService.findAll();
+		
 		/*
 		 * List<User> list = userService.findAll(); for (User user : list) {
 		 * System.out.println(user); }
@@ -97,6 +103,7 @@ public class ScheduledTasks {
 		for (Map<String, Object> map : list) {
 			System.out.println(map);
 		}
+		//this.commonDBTemplate.closeConnection();
 
 	}
 
@@ -122,6 +129,7 @@ public class ScheduledTasks {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+		this.commonDBTemplate.closeConnection();
 		long endtime = System.currentTimeMillis();
 		log.info("定时发送短信超时提醒邮件成功,用时"+(endtime-begintime)+"毫秒！");
 	}
@@ -283,6 +291,7 @@ public class ScheduledTasks {
 	                }
 	           // }
 	        }
+	        this.commonDBTemplate.closeConnection();
 	        long endtime = System.currentTimeMillis();
 	        log.info("执行导入商家信息excel成功,用时"+(endtime-begintime)+"毫秒。");
 	}
@@ -297,6 +306,7 @@ public class ScheduledTasks {
 		saveSupplyer();
 		saveProducts();
 		saveSupplyerByType();
+		this.commonDBTemplate.closeConnection();
 		long endtime = System.currentTimeMillis();
 	    log.info("执行OCS同步刷新成功,用时"+(endtime-begintime)+"毫秒。");
 	}
@@ -347,6 +357,7 @@ public class ScheduledTasks {
 			System.out.println("memcached Exception...");
 			e.printStackTrace();
 		}
+		this.commonDBTemplate.closeConnection();
 		long endtime = System.currentTimeMillis();
 	    log.info("执行秒杀信息加载成功,用时"+(endtime-begintime)+"毫秒。");
 	}

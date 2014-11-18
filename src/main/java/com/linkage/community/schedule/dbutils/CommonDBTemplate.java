@@ -26,6 +26,7 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -39,11 +40,12 @@ import org.springframework.stereotype.Repository;
 public class CommonDBTemplate {
 	private static final Logger logger = LoggerFactory.getLogger(CommonDBTemplate.class);
 	
-	//private static DataSource dataSource = (DataSource)Context.getContext().getAttribute("dataSource");
-	
-	//public static JedisPool  pool = (JedisPool)Context.getContext().getAttribute("jedisPool");
+	private static ThreadLocal<Connection> connMgr = new ThreadLocal<Connection>();
 	
 	private final DataSource dataSource;
+	
+	@Value("${app.switch.threadlocal}")
+	private String switchOfThreadLocal;
 	
 	@Autowired
 	public CommonDBTemplate(DataSource dataSource) {
@@ -112,6 +114,142 @@ public class CommonDBTemplate {
 			}
 		};
 	}
+	
+	
+	//获取当前线程中的链接
+	public Connection CurrentConnection()
+	{
+		Connection conn = null;
+		try
+		{
+			conn = connMgr.get();
+			//System.out.println(Thread.currentThread().getName()+"is runing");
+			if(null==conn)
+			{
+				conn = this.dataSource.getConnection();
+				connMgr.set(conn);//将获取的链接放在当前线程变量中
+			}
+			
+		}
+		catch(SQLException e)
+		{
+			logger.error("获取数据库连接失败！", e);
+			throw new RuntimeException("获取数据库连接失败！", e);
+		}
+		
+		return conn;
+	}
+	
+	//开启事物
+	public void beginTransaction()
+	{
+		Connection conn = this.CurrentConnection();
+		try
+		{
+			
+			if(conn.getAutoCommit())
+			{
+				conn.setAutoCommit(false);
+			}
+		}
+		catch(SQLException e)
+		{
+			logger.error("开启事物失败！", e);
+			throw new RuntimeException("开启事物失败！", e);
+		}
+	}
+	
+	//关闭事物
+	public void commitTransaction()
+	{
+		Connection conn = connMgr.get();
+		try
+		{
+			if(null!=conn)
+			{
+				if(!conn.getAutoCommit())
+				{
+					conn.commit();
+				}
+			}
+		}
+		catch(SQLException e)
+		{
+			logger.error("开启事物失败！", e);
+			throw new RuntimeException("开启事物失败！", e);
+		}
+	}
+	
+	//回滚事物
+	public void rollbackTransaction()
+	{
+		Connection conn = connMgr.get();
+		try
+		{
+			if(null!=conn)
+			{
+				if(!conn.getAutoCommit())
+				{
+					conn.rollback();
+				}
+			}
+		}
+		catch(SQLException e)
+		{
+			logger.error("回滚事物失败！", e);
+			throw new RuntimeException("回滚事物失败！", e);
+		}
+	}
+	
+	public void recoverTransction() 
+	{
+		Connection conn = connMgr.get();
+		try
+		{
+			if(null!=conn)
+			{
+				if(conn.getAutoCommit())
+				{
+					conn.setAutoCommit(false);
+				}
+				else
+				{
+					conn.setAutoCommit(true);
+				}
+			}
+		}
+		catch(SQLException e)
+		{
+			logger.error("复原事物状态失败！", e);
+			throw new RuntimeException("复原事物状态失败！", e);
+		}
+	}
+	
+	
+	public void closeConnection()
+	{
+		Connection conn = connMgr.get();
+		try
+		{
+			if(null!=conn)
+			{
+				conn.close();
+				conn = null;
+			}
+		}
+		catch(SQLException e)
+		{
+			logger.error("关闭链接失败！", e);
+			throw new RuntimeException("关闭链接失败！", e);
+		}
+		finally
+		{
+			connMgr.remove();
+		}
+	}
+	
+	
+	
 
 	public List<Map<String, Object>> queryMapList(String sql) {
 		return queryMapList(sql, (Object[]) null);
@@ -121,8 +259,16 @@ public class CommonDBTemplate {
 			Object[] params) {
 		List<Map<String, Object>> mapList = null;
 		try {
-			mapList = qr2.query(sql, new MapListHandler(
-					new CustomRowProcessor()), params);
+			if("1".equals(switchOfThreadLocal))
+			{
+				mapList = qr.query(this.CurrentConnection(), sql, new MapListHandler(
+						new CustomRowProcessor()), params);
+			}
+			else
+			{
+				mapList = qr2.query(sql, new MapListHandler(
+						new CustomRowProcessor()), params);
+			}
 		} catch (SQLException e) {
 			// e.printStackTrace();
 			logger.error("查询SQL异常:" + sql, e);
@@ -157,8 +303,16 @@ public class CommonDBTemplate {
 	public Map<String, Object> queryOneMap(String sql, Object[] params) {
 		Map<String, Object> map = null;
 		try {
-			map = qr2.query(sql, new MapHandler(new CustomRowProcessor()),
-					params);
+			if("1".equals(switchOfThreadLocal))
+			{
+				map = qr.query(this.CurrentConnection(), sql, new MapHandler(new CustomRowProcessor()),
+						params);
+			}
+			else
+			{
+				map = qr2.query(sql, new MapHandler(new CustomRowProcessor()),
+						params);
+			}
 		} catch (SQLException e) {
 			logger.error("查询SQL异常:" + sql, e);
 			throw new RuntimeException("查询SQL异常:" + sql, e);
@@ -194,7 +348,14 @@ public class CommonDBTemplate {
 	public <T> T queryOneBean(Class<T> type, String sql, Object[] params) {
 		T bean = null;
 		try {
-			bean = qr2.query(sql, new BeanHandler<T>(type), params);
+			if("1".equals(switchOfThreadLocal))
+			{
+				bean = qr.query(this.CurrentConnection(), sql, new BeanHandler<T>(type), params);
+			}
+			else
+			{
+				bean = qr2.query(sql, new BeanHandler<T>(type), params);
+			}
 		} catch (SQLException e) {
 			logger.error("查询SQL异常:" + sql, e);
 			throw new RuntimeException("查询SQL异常:" + sql, e);
@@ -248,7 +409,14 @@ public class CommonDBTemplate {
 			Object[] params) {
 		List<T> beanList = null;
 		try {
-			beanList = qr2.query(sql, new BeanListHandler<T>(type), params);
+			if("1".equals(switchOfThreadLocal))
+			{
+				beanList = qr.query(this.CurrentConnection(), sql, new BeanListHandler<T>(type), params);
+			}
+			else
+			{
+				beanList = qr2.query(sql, new BeanListHandler<T>(type), params);
+			}
 		} catch (SQLException e) {
 			logger.error("查询SQL异常:" + sql, e);
 			throw new RuntimeException("查询SQL异常:" + sql, e);
@@ -296,8 +464,17 @@ public class CommonDBTemplate {
 			Object[] params) {
 		List<T> columnValueList = null;
 		try {
-			columnValueList = qr2.query(sql, new ColumnListHandler<T>(
-					columnName), params);
+			if("1".equals(switchOfThreadLocal))
+			{
+				columnValueList = qr.query(this.CurrentConnection(),sql, new ColumnListHandler<T>(
+						columnName), params);
+			}
+			else
+			{
+				columnValueList = qr2.query(sql, new ColumnListHandler<T>(
+						columnName), params);
+			}
+			
 		} catch (SQLException e) {
 			logger.error("查询SQL异常:" + sql, e);
 			throw new RuntimeException("查询SQL异常:" + sql, e);
@@ -309,8 +486,16 @@ public class CommonDBTemplate {
 			Object[] params) {
 		List<T> columnValueList = null;
 		try {
-			columnValueList = qr2.query(sql, new ColumnListHandler<T>(
-					columnIndex), params);
+			if("1".equals(switchOfThreadLocal))
+			{
+				columnValueList = qr.query(this.CurrentConnection(),sql, new ColumnListHandler<T>(
+						columnIndex), params);
+			}
+			else
+			{
+				columnValueList = qr2.query(sql, new ColumnListHandler<T>(
+						columnIndex), params);
+			}
 		} catch (SQLException e) {
 			logger.error("查询SQL异常:" + sql, e);
 			throw new RuntimeException("查询SQL异常:" + sql, e);
@@ -364,7 +549,14 @@ public class CommonDBTemplate {
 	public <T> T queryObject(int columnIndex, String sql, Object[] params) {
 		T obj = null;
 		try {
-			obj = qr2.query(sql, new ScalarHandler<T>(columnIndex), params);
+			if("1".equals(switchOfThreadLocal))
+			{
+				obj = qr.query(this.CurrentConnection(), sql, new ScalarHandler<T>(columnIndex), params);
+			}
+			else
+			{
+				obj = qr2.query(sql, new ScalarHandler<T>(columnIndex), params);
+			}
 		} catch (SQLException e) {
 			logger.error("查询SQL异常:" + sql, e);
 			throw new RuntimeException("查询SQL异常:" + sql, e);
@@ -376,7 +568,14 @@ public class CommonDBTemplate {
 			Object[] params) {
 		T obj = null;
 		try {
-			obj = qr2.query(sql, new ScalarHandler<T>(columnName), params);
+			if("1".equals(switchOfThreadLocal))
+			{
+				obj = qr.query(this.CurrentConnection(), sql, new ScalarHandler<T>(columnName), params);
+			}
+			else
+			{
+				obj = qr2.query(sql, new ScalarHandler<T>(columnName), params);
+			}
 		} catch (SQLException e) {
 			logger.error("查询SQL异常:" + sql, e);
 			throw new RuntimeException("查询SQL异常:" + sql, e);
@@ -420,7 +619,15 @@ public class CommonDBTemplate {
 	public int queryCount(String sql, Object[] params) {
 		Number num = 0;
 		try {
-			num = (Number) qr2.query(sql, new ScalarHandler<Object>(), params);
+			if("1".equals(switchOfThreadLocal))
+			{
+				num = (Number) qr.query(this.CurrentConnection(), sql, new ScalarHandler<Object>(),
+						params);
+			}
+			else
+			{
+				num = (Number) qr2.query(sql, new ScalarHandler<Object>(), params);	
+			}
 		} catch (SQLException e) {
 			logger.error("查询SQL异常:" + sql, e);
 			throw new RuntimeException("查询SQL异常:" + sql, e);
@@ -451,7 +658,15 @@ public class CommonDBTemplate {
 	public int saveOrUpdateOrDelete(String sql, Object[] params) {
 		int rows = 0;
 		try {
-			rows = qr2.update(sql, params);
+			if("1".equals(switchOfThreadLocal))
+			{
+				rows = qr.update(this.CurrentConnection(), sql, params);
+			}
+			else
+			{
+				rows = qr2.update(sql, params);
+			}
+			
 		} catch (SQLException e) {
 			logger.error("执行SQL异常:" + sql, e);
 			throw new RuntimeException("执行SQL异常:" + sql, e);
@@ -482,7 +697,15 @@ public class CommonDBTemplate {
 	public int[] batchUpdate(String sql, Object[][] params) {
 		int[] rows = new int[0];
 		try {
-			rows = qr2.batch(sql, params);
+			if("1".equals(switchOfThreadLocal))
+			{
+				rows = qr.batch(this.CurrentConnection(), sql, params);
+			}
+			else
+			{
+				rows = qr2.batch(sql, params);
+			}
+			
 		} catch (SQLException e) {
 			logger.error("执行SQL异常:" + sql, e);
 			throw new RuntimeException("执行SQL异常:" + sql, e);
@@ -513,7 +736,14 @@ public class CommonDBTemplate {
 	public <T> T insertAndReturnPK(String sql, Object[] params) {
 		T primarykey = null;
 		try {
-			primarykey = qr2.insert(sql, new ScalarHandler<T>(), params);
+			if("1".equals(switchOfThreadLocal))
+			{
+				primarykey = qr.insert(this.CurrentConnection(), sql, new ScalarHandler<T>(), params);
+			}
+			else
+			{
+				primarykey = qr2.insert(sql, new ScalarHandler<T>(), params);
+			}
 		} catch (SQLException e) {
 			logger.error("插入SQL异常:" + sql, e);
 			throw new RuntimeException("插入SQL异常:" + sql, e);
@@ -544,8 +774,17 @@ public class CommonDBTemplate {
 	public <T> List<T> insertBatch(String sql, Object[][] params) {
 		List<T> primaryKeyList = null;
 		try {
-			primaryKeyList = qr.insertBatch(sql, new ColumnListHandler<T>(),
-					params);
+			if("1".equals(switchOfThreadLocal))
+			{
+				primaryKeyList = qr.insertBatch(this.CurrentConnection(), sql,
+						new ColumnListHandler<T>(), params);
+			}
+			else
+			{
+				primaryKeyList = qr.insertBatch(sql, new ColumnListHandler<T>(),
+						params);
+			}
+			
 		} catch (SQLException e) {
 			logger.error("插入SQL异常:" + sql, e);
 			throw new RuntimeException("插入SQL异常:" + sql, e);
@@ -628,11 +867,12 @@ public class CommonDBTemplate {
 	}
 
 	public static void main(String[] args) throws Exception {
-		String sql = load.get("bbs.bbs_form_type");
+		/*String sql = load.get("bbs.bbs_form_type");
 		logger.info(sql);
 		boolean loadDriver = DbUtils.loadDriver(load2
 				.get("jdbc.driverClassName"));
-		Connection conn = open();
+		Connection conn = open();*/
+		
 		/*List<Map<String, Object>> queryMapList = queryMapList(conn, sql);
 		for (Map<String, Object> map : queryMapList) {
 			System.out.println(map);
@@ -664,7 +904,8 @@ public class CommonDBTemplate {
 		for (Map<String, Object> map : pageList) {
 			System.out.println(map);
 		}*/
-
+		
+		
 	}
 
 }
