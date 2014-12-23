@@ -234,7 +234,7 @@ public class CommonDBTemplate {
 			if(null!=conn)
 			{
 				conn.close();
-				conn = null;
+				//conn = null;
 			}
 		}
 		catch(SQLException e)
@@ -781,7 +781,7 @@ public class CommonDBTemplate {
 			}
 			else
 			{
-				primaryKeyList = qr.insertBatch(sql, new ColumnListHandler<T>(),
+				primaryKeyList = qr2.insertBatch(sql, new ColumnListHandler<T>(),
 						params);
 			}
 			

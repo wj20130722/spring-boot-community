@@ -41,14 +41,19 @@ import org.springframework.context.annotation.ImportResource;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 
+import com.alibaba.fastjson.JSONArray;
+import com.alibaba.fastjson.JSONObject;
 import com.linkage.community.schedule.dbutils.CommonDBTemplate;
 import com.linkage.community.schedule.mail.MailSenderFactory;
 import com.linkage.community.schedule.mail.MailSenderType;
 import com.linkage.community.schedule.mail.SimpleMailSender;
-import com.linkage.community.schedule.service.UserService;
+import com.linkage.community.schedule.push.xinge.XingeAppPushUtil;
 import com.linkage.community.schedule.utils.CommonHttpUtil;
 import com.linkage.community.schedule.utils.Conver;
 import com.linkage.community.schedule.utils.FileUtils;
+import com.tencent.xinge.ClickAction;
+import com.tencent.xinge.Message;
+import com.tencent.xinge.MessageIOS;
 
 /**
  * 社区APP后台定时任务
@@ -103,7 +108,7 @@ public class ScheduledTasks {
 		for (Map<String, Object> map : list) {
 			System.out.println(map);
 		}
-		//this.commonDBTemplate.closeConnection();
+		this.commonDBTemplate.closeConnection();
 
 	}
 
@@ -132,6 +137,192 @@ public class ScheduledTasks {
 		this.commonDBTemplate.closeConnection();
 		long endtime = System.currentTimeMillis();
 		log.info("定时发送短信超时提醒邮件成功,用时"+(endtime-begintime)+"毫秒！");
+	}
+	
+	//@Scheduled(fixedRate=5000)
+	public void pushPersonMessage() throws Exception
+	{
+		sendPersonMessage("5","宅里宅外秒杀活动提醒","宅里宅外圣诞豪礼0元秒杀，458元写真、儿童理发、美容项目整点开抢。");
+	}
+	
+	//@Scheduled(cron="0 20 15 23 12 ? 2014")
+	public void pushMessage()
+	{
+		sendSysMessage("宅里宅外秒杀活动提醒","宅里宅外栖庭专场—圣诞豪礼0元秒杀，458元写真、儿童理发、美容项目整点开抢。","2014-12-23 15:20:00");
+	}
+	
+	//@Scheduled(cron="0 45 10 24 12 ? 2014")
+	public void pushMessage2()
+	{
+		sendSysMessage("宅里宅外秒杀活动提醒","栖庭用户注意啦！留下这个冬天最美的自己，专业写真套系11点开抢！","2014-12-24 10:45:00");
+	}
+	
+	//@Scheduled(cron="0 45 19 24 12 ? 2014")
+	public void pushMessage3()
+	{
+		sendSysMessage("宅里宅外秒杀活动提醒","栖庭用户注意啦！想过一千次，不如去做一次，平安夜给孩子再填一份礼物吧，价值458元专业写真。","2014-12-24 19:45:00");
+	}
+	
+	//@Scheduled(cron="0 45 15 25 12 ? 2014")
+	public void pushMessage4()
+	{
+		sendSysMessage("宅里宅外秒杀活动提醒","栖庭用户注意啦！16点准点开抢，带着小孩免费去理发！","2014-12-25 15:45:00");
+	}
+	
+	//@Scheduled(cron="0 45 19 25 12 ? 2014")
+	public void pushMessage5()
+	{
+		sendSysMessage("宅里宅外秒杀活动提醒","栖庭用户注意啦！圣诞快结束了，对老婆、对妈妈好一点，他们辛勤为我们准备了礼物，20点美容礼包抢了送给她！","2014-12-25 19:45:00");
+	}
+	
+	
+	public void sendPersonMessage(String user_id,String title,String content) throws Exception
+	{
+		long begintime = System.currentTimeMillis();
+		
+		SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+		String dataStr = sdf.format(new Date());
+		//插入推送的系统消息
+		StringBuffer sb = new StringBuffer();
+		sb.append("insert into push_message(push_title,push_content,push_type,message_type,push_source,push_target,push_url,push_state,push_time) ")
+		.append("select '"+title+"' as push_title,'"+content+"' as push_content,")
+		.append("3 as push_type,1 as message_type,'-1' as push_source,user_id as user_id,null as push_url,'0' as push_state,'"+dataStr+"' as push_time ")
+		.append("from register_user ")
+		.append("where user_id="+user_id);
+		this.commonDBTemplate.saveOrUpdateOrDelete(sb.toString());
+		//推送消息
+		//封装custom
+    	Map<String, Object> custom = new HashMap<String, Object>();
+		custom.put("type", "1");
+		String sql = "select t1.user_state,t1.phone_number,t2.phone_platform from register_user t1,user_info t2 where  t1.user_id=t2.user_id and t1.user_id=?";
+		Map<String, Object> map = this.commonDBTemplate.queryOneMap(sql, new Object[]{Integer.parseInt(user_id)});
+		String phone_number = Conver.convertNull(map.get("phone_number"));
+		String phone_platform = Conver.convertNull(map.get("phone_platform"));
+		String user_state = Conver.convertNull(map.get("user_state"));
+		org.json.JSONObject jsonObject = null;
+		String push_state = "";
+		if(user_state.equals("1")){
+		    //IOS推送
+    		if(phone_platform.equals("1"))
+    		{
+    			if(content.getBytes("UTF-8").length>140){
+    				content = substring(content,140,"...");
+    			}
+    			//content = title +":"+ content;
+    			MessageIOS message = XingeAppPushUtil.constructMessageIOS(title,content, custom);
+    			//单个发送
+    			jsonObject = XingeAppPushUtil.pushSingleAccountIOS(message, phone_number);
+    		}
+    		else //ANDROID推送
+    		{
+    			Message  message = XingeAppPushUtil.constructMessageAndroid(Message.TYPE_NOTIFICATION, 1, ClickAction.TYPE_INTENT, title, content,"intent:#Intent;component=com.linkage.community/.ucenter.NotifyActivity;S.type=1;end", custom);
+    			jsonObject = XingeAppPushUtil.pushSingleAccountAndriod(message, phone_number);
+    		}
+    		push_state = jsonObject.get("ret_code").toString();
+    		log.info("消息推送状态："+push_state);
+		}
+		this.commonDBTemplate.closeConnection();
+		long endtime = System.currentTimeMillis();
+		log.info("消息发送给用户标识为:"+user_id+"的用户成功,用时"+(endtime-begintime)+"毫秒！");
+	}
+	
+	public void sendSysMessage(String title,String content,String dataStr)
+	{
+		long begintime = System.currentTimeMillis();
+		//插入推送的系统消息
+		StringBuffer sb = new StringBuffer();
+		sb.append("insert into push_message(push_title,push_content,push_type,message_type,push_source,push_target,push_url,push_state,push_time) ")
+		.append("select '"+title+"' as push_title,'"+content+"' as push_content,")
+		.append("3 as push_type,1 as message_type,'-1' as push_source,user_id as user_id,null as push_url,'0' as push_state,'"+dataStr+"' as push_time ")
+		.append("from register_user");
+		this.commonDBTemplate.saveOrUpdateOrDelete(sb.toString());
+		//推送消息
+		Map<String, Object> custom = new HashMap<String, Object>();
+		custom.put("type", "1");
+		Message andriodMessage = XingeAppPushUtil.constructMessageAndroid(Message.TYPE_NOTIFICATION, 1, ClickAction.TYPE_INTENT, title,content ,"intent:#Intent;component=com.linkage.community/.ucenter.NotifyActivity;S.type=1;end", custom);
+		MessageIOS iosMessage = XingeAppPushUtil.constructMessageIOS(title,content, custom);
+		org.json.JSONObject jsonObject = XingeAppPushUtil.pushAllDeviceAndroid(andriodMessage);
+		org.json.JSONObject jsonObject1 = XingeAppPushUtil.pushAllDeviceIOS(iosMessage);
+		try {
+			log.info("安卓消息推送状态："+jsonObject.get("ret_code").toString());
+			log.info("IOS消息推送状态："+jsonObject1.get("ret_code").toString());
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+		this.commonDBTemplate.closeConnection();
+		long endtime = System.currentTimeMillis();
+		log.info("消息群推成功,用时"+(endtime-begintime)+"毫秒！");
+	}
+	
+	 //根据字节数截取字符串
+    public static String substring(String str, int toCount,String more) throws UnsupportedEncodingException
+	 {
+		 int reInt = 0;
+		 String reStr = "";
+		 if (str == null)
+		 return "";
+		 char[] tempChar = str.toCharArray();
+		 for (int kk = 0; (kk < tempChar.length && toCount > reInt); kk++) {
+			 String s1 = str.valueOf(tempChar[kk]);
+			 byte[] b = s1.getBytes("UTF-8");
+			 reInt += b.length;
+			 reStr += tempChar[kk];
+		 }
+		 if (toCount == reInt || (toCount == reInt - 1))
+			 reStr += more;
+		 return reStr;
+	 }
+	
+	
+	@Scheduled(cron="0 0 * * * ?")
+	public void weatherTask()
+	{
+		long begintime = System.currentTimeMillis();
+		ArrayList list = new ArrayList();
+		List<Map<String, Object>> citys = commonDBTemplate.queryMapList("select t.req_code,t.city_name from  weather_config t");
+		Map<String,Object> map = null;
+		CloseableHttpClient httpClient = CommonHttpUtil.getHttpClientInstance();
+		
+		for(int i=0;i<citys.size();i++){
+			map = citys.get(i);
+			//天气
+			String url1 = "http://www.weather.com.cn/data/cityinfo/"+map.get("req_code")+".html";
+			
+			HttpGet getMethod = CommonHttpUtil.getGetMethod(url1, new ArrayList<BasicHeader>());
+			JSONObject result = CommonHttpUtil.callHttpClient2(httpClient, getMethod);
+			//PM2.5
+			String cityName=map.get("city_name").toString().replace("市","");
+			String url2 = "http://www.pm25.in/api/querys/pm2_5.json?city="+cityName+"&token=PpJwsr28BMgPW2FFrdx3";
+			System.out.println(cityName);
+			HttpGet getMethod1 = CommonHttpUtil.getGetMethod(url2, new ArrayList<BasicHeader>());
+			JSONArray pmresult = CommonHttpUtil.callHttpClient4(httpClient, getMethod1);
+			if(pmresult!=null&&result!=null){
+				JSONObject weatherinfo = JSONObject.parseObject(result.get("weatherinfo").toString());
+				JSONObject pm = JSONObject.parseObject(pmresult.get(pmresult.size()-1).toString());
+				String city_code=weatherinfo.get("cityid").toString();
+				String weather=weatherinfo.get("weather").toString();
+				String temp1=weatherinfo.get("temp1").toString();
+				String temp2=weatherinfo.get("temp2").toString();
+				String pm2_5=pm.getString("pm2_5").toString();
+				String quality=pm.getString("quality").toString();
+				Object[] param = new Object[]{weather,temp1,temp2,pm2_5,quality,city_code};
+				list.add(param);
+			}
+		}
+	  Object[][] params2 = new Object[list.size()][];
+      for(int k=0;k<list.size();k++)
+      	params2[k] = (Object[])list.get(k);
+      this.commonDBTemplate.batchUpdate("update weather_config set weather=?,temp1=?,temp2=?,pm2_5=?,quality=? where req_code=?", params2);
+      try {
+		httpClient.close();
+	} catch (IOException e) {
+		e.printStackTrace();
+	}
+	this.commonDBTemplate.closeConnection();
+	long endtime = System.currentTimeMillis();
+	log.info("同步天气信息成功,用时"+(endtime-begintime)+"毫秒！");
+		
 	}
 	
 	//每天凌晨3点执行一次商家信息导入操作
@@ -322,7 +513,7 @@ public class ScheduledTasks {
 				return;
 			}
 			//将秒杀活动信息放入到ocs中
-			String sql = "select seckill_id, seckill_begin, seckill_end, seckill_count from seckill where unix_timestamp(seckill_end) >= unix_timestamp(sysdate())";
+			String sql = "select seckill_id, unix_timestamp(seckill_begin) as seckill_begin, unix_timestamp(seckill_end) as seckill_end, seckill_count from seckill where unix_timestamp(seckill_end) >= unix_timestamp(sysdate())";
 			Map[] seckills = this.commonDBTemplate.queryMapList(sql).toArray(new HashMap[0]);
 			for(Map seckill : seckills) {
 				String seckill_id = seckill.get("seckill_id").toString();
@@ -339,7 +530,7 @@ public class ScheduledTasks {
 				//秒杀剩余数量
 				//System.out.println("put key_seckill_user..." + seckill.get("seckill_remain").toString());
 				int count = Conver.convertInt(seckill.get("seckill_count").toString());
-				memcachedClient.set(key_seckill_count, 0, count);
+		        this.memcachedClient.set(key_seckill_count, 0, Integer.valueOf(count));
 				//已秒杀成功的用户
 				ArrayList seckilled = new ArrayList(count);
 				String sql2 = "select user_id from  orders_management where seckill_id=?";
