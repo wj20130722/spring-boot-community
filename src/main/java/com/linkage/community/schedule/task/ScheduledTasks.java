@@ -20,6 +20,11 @@ import java.util.Map;
 
 import net.spy.memcached.MemcachedClient;
 
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.HttpException;
+import org.apache.commons.httpclient.NameValuePair;
+import org.apache.commons.httpclient.methods.PostMethod;
+import org.apache.commons.httpclient.params.HttpMethodParams;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.message.BasicHeader;
@@ -51,6 +56,7 @@ import com.linkage.community.schedule.push.xinge.XingeAppPushUtil;
 import com.linkage.community.schedule.utils.CommonHttpUtil;
 import com.linkage.community.schedule.utils.Conver;
 import com.linkage.community.schedule.utils.FileUtils;
+import com.linkage.community.schedule.utils.WeimiSms;
 import com.tencent.xinge.ClickAction;
 import com.tencent.xinge.Message;
 import com.tencent.xinge.MessageIOS;
@@ -67,7 +73,7 @@ import com.tencent.xinge.MessageIOS;
 public class ScheduledTasks {
 
 	private static final SimpleDateFormat dateFormat = new SimpleDateFormat(
-			"HH:mm:ss");
+			"yyyy-MM-dd HH:mm:ss");
 
 	// private final Log log = LogFactory.getLog(getClass());//common-log
 	// private final Logger log = Logger.getLogger(getClass());//log4j
@@ -79,6 +85,15 @@ public class ScheduledTasks {
     public static final String FILEPATH = "/tomcat/webapps/community/productImg";
     
     public static final String QINIU_IMG_HOST = "http://zlzwimg.qiniudn.com";
+    
+	//服务http地址
+	private static String BASE_URI = "http://yunpian.com";
+	//服务版本号
+	public static String VERSION = "v1";
+	//apikey
+	public static final String apiKey = "88e037763b05c3f8839ccd3757e95060";
+    //通用发短信接口
+	public static String URI_SEND_SMS = BASE_URI + "/" + VERSION + "/sms/send.json";
 
 	@Autowired
 	private CommonDBTemplate commonDBTemplate;
@@ -139,49 +154,157 @@ public class ScheduledTasks {
 		log.info("定时发送短信超时提醒邮件成功,用时"+(endtime-begintime)+"毫秒！");
 	}
 	
-	//@Scheduled(fixedRate=5000)
+	
+	//@Scheduled(fixedRate=10000)
 	public void pushPersonMessage() throws Exception
 	{
-		sendPersonMessage("5","宅里宅外秒杀活动提醒","宅里宅外圣诞豪礼0元秒杀，458元写真、儿童理发、美容项目整点开抢。");
+		sendPersonMessage("153","宅里宅外秒杀活动提醒","栖庭专场-开年抢个好兆头，价值76元的吉丽嘉多双人下午茶限量0元秒杀，活动详情请您查看首页通告。");
+		sendPersonMessage("51","宅里宅外秒杀活动提醒","栖庭专场-开年抢个好兆头，价值76元的吉丽嘉多双人下午茶限量0元秒杀，活动详情请您查看首页通告。");
 	}
 	
-	//@Scheduled(cron="0 20 15 23 12 ? 2014")
+	//@Scheduled(cron="0 47 17 23 12 ?")
+	public void search()
+	{
+		String value1 = memcachedClient.get("seckill_15_begin").toString();
+		String value2 = memcachedClient.get("seckill_15_end").toString();
+		String value3 = memcachedClient.get("seckill_15_count").toString();
+		System.out.println("seckill_15_begin=" + value1);
+		System.out.println("seckill_15_end=" + value2);
+		System.out.println("seckill_15_count=" + value3);
+	}
+	
+	/*@Scheduled(cron="0 0 17 30 12 ?")
 	public void pushMessage()
 	{
-		sendSysMessage("宅里宅外秒杀活动提醒","宅里宅外栖庭专场—圣诞豪礼0元秒杀，458元写真、儿童理发、美容项目整点开抢。","2014-12-23 15:20:00");
+		sendSysMessage("宅里宅外秒杀活动提醒","栖庭专场-开年抢个好兆头，价值76元的吉丽嘉多双人下午茶限量0元秒杀，活动详情请您查看首页通告。",dateFormat.format(new Date()));
 	}
 	
-	//@Scheduled(cron="0 45 10 24 12 ? 2014")
+	@Scheduled(cron="0 55 9 31 12 ?")
 	public void pushMessage2()
 	{
-		sendSysMessage("宅里宅外秒杀活动提醒","栖庭用户注意啦！留下这个冬天最美的自己，专业写真套系11点开抢！","2014-12-24 10:45:00");
+		sendSysMessage("宅里宅外秒杀活动提醒","栖庭用户请注意哦，马上开抢！您与双人下午茶套餐的距离只是手指与屏幕的距离。请您点击首页秒杀专区。",dateFormat.format(new Date()));
+	}*/
+	
+	
+	/*@Scheduled(cron="0 18 20 23 12 ?")
+	public void pushMessage()
+	{
+		sendSysMessage("宅里宅外秒杀活动提醒","宅里宅外栖庭专场—圣诞豪礼0元秒杀，458元写真、儿童理发、美容项目整点开抢。",dateFormat.format(new Date()));
 	}
 	
-	//@Scheduled(cron="0 45 19 24 12 ? 2014")
+	@Scheduled(cron="0 10 10 24 12 ?")
+	public void pushMessage2()
+	{
+		sendSysMessage("宅里宅外秒杀活动提醒","栖庭用户注意啦！给小孩留下这个冬天最美的自己，专业儿童写真套系11点0元开抢！详细活动请于首页查看。",dateFormat.format(new Date()));
+	}
+	
+	@Scheduled(cron="0 55 19 24 12 ?")
 	public void pushMessage3()
 	{
-		sendSysMessage("宅里宅外秒杀活动提醒","栖庭用户注意啦！想过一千次，不如去做一次，平安夜给孩子再填一份礼物吧，价值458元专业写真。","2014-12-24 19:45:00");
+		sendSysMessage("宅里宅外秒杀活动提醒","栖庭用户注意啦！平安夜给孩子再填一份礼物吧，价值458元专业写真20点0元开抢。详细活动请于首页查看。20点开抢！",dateFormat.format(new Date()));
 	}
 	
-	//@Scheduled(cron="0 45 15 25 12 ? 2014")
+	@Scheduled(cron="0 55 15 25 12 ?")
 	public void pushMessage4()
 	{
-		sendSysMessage("宅里宅外秒杀活动提醒","栖庭用户注意啦！16点准点开抢，带着小孩免费去理发！","2014-12-25 15:45:00");
+		sendSysMessage("宅里宅外秒杀活动提醒","栖庭用户注意啦！16点准点开抢，带着小孩免费去理发！详细活动请于首页查看。",dateFormat.format(new Date()));
 	}
 	
-	//@Scheduled(cron="0 45 19 25 12 ? 2014")
+	@Scheduled(cron="0 55 19 25 12 ?")
 	public void pushMessage5()
 	{
-		sendSysMessage("宅里宅外秒杀活动提醒","栖庭用户注意啦！圣诞快结束了，对老婆、对妈妈好一点，他们辛勤为我们准备了礼物，20点美容礼包抢了送给她！","2014-12-25 19:45:00");
+		sendSysMessage("宅里宅外秒杀活动提醒","栖庭用户注意啦！圣诞快结束了，对老婆、对妈妈好一点，20点美容礼包抢了送给她！详细活动请于首页查看。",dateFormat.format(new Date()));
+	}*/
+	
+	//@Scheduled(fixedDelay=10000)
+	@Scheduled(cron="0 30 14 * * ?")
+	public void sendAdminSms()
+	{
+		String sql = "select count(1) FROM orders_management o left join delivery_config d on d.delivery_type_id=o.delivery_type_id where o.order_state=1 and d.is_delivery=1";
+		int count = this.commonDBTemplate.queryCount(sql);
+		String str = "尊敬的管理员您好，系统有"+count+"笔订单已付款未发货，请及时发货。(此验证码有效期为5分钟)，如非本人操作，请忽略本短信。【宅里宅外】";
+		String str2 = "尊敬的管理员您好，系统有"+count+"笔订单已付款未发货，请及时发货。";
+		String smstype =  Conver.convertNull(memcachedClient.get("smstype2"));
+		if(count > 0)
+		{
+			if(smstype.equals("1")){
+	        	smsService(Long.parseLong("18951765458"), str);
+	        }else{
+	        	smsWeimi(Long.parseLong("18951765458"), str2);
+	        }
+		}
+		this.commonDBTemplate.closeConnection();
 	}
 	
-	
+	 public boolean smsService(Long phoneNum, String content)
+	    {
+		 long begintime = System.currentTimeMillis();
+	        boolean result = false;
+	        HttpClient client = new HttpClient();
+	        NameValuePair[] nameValuePairs = new NameValuePair[3];
+	        nameValuePairs[0] = new NameValuePair("apikey", apiKey);
+	        nameValuePairs[1] = new NameValuePair("text", content);
+	        nameValuePairs[2] = new NameValuePair("mobile", String.valueOf(phoneNum));
+	        PostMethod method = new PostMethod(URI_SEND_SMS);
+	        method.setRequestBody(nameValuePairs);
+	        HttpMethodParams param = method.getParams();
+	        param.setContentCharset("UTF-8");
+	        try {
+	            client.executeMethod(method);
+	            JSONObject json=JSONObject.parseObject(method.getResponseBodyAsString());
+	            if(0==json.getIntValue("code"))
+	            {
+	            	result = true;
+	            	log.info("通过云片发送短信成功:"+json.toJSONString());
+	            }
+	            else 
+	            {
+	                result = false;
+	                log.info("通过云片发送短信失败:"+json.toJSONString());
+	            }
+	        } catch (HttpException e) {
+	            e.printStackTrace();
+	        } catch (IOException e) {
+	            e.printStackTrace();
+	        }
+	        long endtime = System.currentTimeMillis();
+			log.info("通过云片发送短信,用时"+(endtime-begintime)+"毫秒！");
+	        return result;
+	    }
+	    
+	    public boolean smsWeimi(Long phoneNum, String content) {
+	    	long begintime = System.currentTimeMillis();
+	    	boolean result = false;
+	    	String[][] data = null;
+	        ArrayList<String[]> para = new ArrayList<String[]>();
+	        para.add(new String[] { "cid", "8FVqSlzvKXFF" });
+	        para.add(new String[] { "mob", phoneNum.toString() });
+	        para.add(new String[] { "uid", "8xHNZ03Rd447" });
+	        para.add(new String[] { "pas", "cmnk9z2v" });
+	        para.add(new String[] { "p1", content });
+	        para.add(new String[] { "type", "json" });
+	        data = new String[para.size()][];
+	        para.toArray(data);
+	        JSONObject json=JSONObject.parseObject(WeimiSms.postHTML("http://api.weimi.cc/2/sms/send.html",data, 3, "UTF-8"));
+			int code = json.getIntValue("code");
+			if(0 == code){
+				log.info("通过微米发送短信成功:"+json.toJSONString());
+	            result = true;
+			}else{
+				log.info("通过微米发送短信失败:"+json.toJSONString());
+				result = false;
+			}
+			long endtime = System.currentTimeMillis();
+			log.info("通过微米发送短信,用时"+(endtime-begintime)+"毫秒！");
+	        return result;
+		}
+	    
+	    
 	public void sendPersonMessage(String user_id,String title,String content) throws Exception
 	{
 		long begintime = System.currentTimeMillis();
 		
-		SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-		String dataStr = sdf.format(new Date());
+		String dataStr = dateFormat.format(new Date());
 		//插入推送的系统消息
 		StringBuffer sb = new StringBuffer();
 		sb.append("insert into push_message(push_title,push_content,push_type,message_type,push_source,push_target,push_url,push_state,push_time) ")

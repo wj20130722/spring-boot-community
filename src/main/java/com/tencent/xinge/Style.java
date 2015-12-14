@@ -1,0 +1,52 @@
+package com.tencent.xinge;
+
+public class Style {
+	public Style(int builderId)
+	{
+		this(builderId, 0, 0, 1, 0);
+	}
+	public Style(int builderId, int ring, int vibrate, int clearable, int nId)
+	{
+		this.m_builderId = builderId;
+		this.m_ring = ring;
+		this.m_vibrate = vibrate;
+		this.m_clearable = clearable;
+		this.m_nId = nId;
+	}
+	public int getBuilderId()
+	{
+		return m_builderId;
+	}
+	public int getRing()
+	{
+		return m_ring;
+	}
+	public int getVibrate()
+	{
+		return m_vibrate;
+	}
+	public int getClearable()
+	{
+		return m_clearable;
+	}
+	
+	public int getNId()
+	{
+		return m_nId;
+	}
+	
+	public boolean isValid()
+	{
+		if (m_ring<0 || m_ring>1) return false;
+		if (m_vibrate<0 || m_vibrate>1) return false;
+		if (m_clearable<0 || m_clearable>1) return false;
+		
+		return true;
+	}
+	
+	private int m_builderId;
+	private int m_ring;
+	private int m_vibrate;
+	private int m_clearable;
+	private int m_nId;
+}
