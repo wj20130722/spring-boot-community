@@ -18,14 +18,14 @@ public class TestMailSend
    // sb.append("<br>");
    // sb.append("<br>");
    // sb.append("<a href='http://www.baidu.com'>百度</a>");
-  //  sms.send("wangkun7@asiainfo.com", "测试", sb.toString());
+  //  sms.send("xxxxxxx", "测试", sb.toString());
     
     int userId = 1111;
     int shopId = 22222;
     
 	List<String> recipients = new ArrayList<String>();
-	recipients.add("xueqt@asiainfo.com");
-	recipients.add("liujia@asiainfo.com");
+	recipients.add("xxxxxx");
+	recipients.add("xxxxxxx");
 	SimpleMailSender sms = MailSenderFactory.getSender(MailSenderType.SERVICE);
 	String mailSubject = "�û�" + userId + "��" + DateFormat.getInstance().format(Calendar.getInstance().getTime())+ "����������̣����̱�ţ�" + shopId;
 	sms.send(recipients, mailSubject, "");
